@@ -14,7 +14,7 @@ from django.core.files import File
 from django.core.exceptions import ImproperlyConfigured, SuspiciousOperation
 from django.core.files.storage import Storage
 from django.conf import settings
-from django.utils.encoding import force_text, force_bytes
+from django.utils.encoding import force_text
 from django.utils.deconstruct import deconstructible
 from django.utils.timezone import utc
 from tempfile import SpooledTemporaryFile
@@ -43,6 +43,7 @@ def _normalize_endpoint(endpoint):
     else:
         return endpoint
 
+
 class OssError(Exception):
     def __init__(self, value):
         self.value = value
@@ -50,13 +51,15 @@ class OssError(Exception):
     def __str__(self):
         return repr(self.value)
 
+
 @deconstructible
 class OssStorage(Storage):
     """
     Aliyun OSS Storage
     """
 
-    def __init__(self, access_key_id=None, access_key_secret=None, end_point=None, bucket_name=None, expire_time=None, location='', base_url=''):
+    def __init__(self, access_key_id=None, access_key_secret=None, end_point=None, bucket_name=None,
+                 expire_time=None, location=None):
         self.access_key_id = access_key_id if access_key_id else _get_config('OSS_ACCESS_KEY_ID')
         self.access_key_secret = access_key_secret if access_key_secret else _get_config('OSS_ACCESS_KEY_SECRET')
         self.end_point = _normalize_endpoint(end_point if end_point else _get_config('OSS_ENDPOINT'))
@@ -67,7 +70,6 @@ class OssStorage(Storage):
         self.service = Service(self.auth, self.end_point)
         self.bucket = Bucket(self.auth, self.end_point, self.bucket_name)
         self.location = location
-        self.base_url = base_url
 
         # try to get bucket acl to check bucket exist or not
         try:
@@ -209,51 +211,53 @@ class OssStorage(Storage):
         return dirs, files
 
     def url(self, name):
-        key = self._get_key_name(name)
-
-        # Return signed bucket url for private acl.
-        if self.bucket_acl == BUCKET_ACL_PRIVATE:
-            return self.bucket.sign_url('GET', key, expires=self.expire_time)
-
-        # For public or public-read acl bucket, use base_url is possible,
-        # otherwise fallback to public bucket url.
-        if self.base_url.startswith("http"):
-            return urljoin(self.base_url, key)
-        else:
-            scheme, endpoint = self.end_point.split('//')
-            return urljoin(scheme + '//' + self.bucket_name + '.' + endpoint, key)
+        return self.public_url(name) if self._is_bucket_public() else self.sign_url(name)
 
     def delete(self, name):
         name = self._get_key_name(name)
         logger().debug("delete name: %s", name)
-        result = self.bucket.delete_object(name)
+        self.bucket.delete_object(name)
 
     def delete_with_slash(self, dirname):
         name = self._get_key_name(dirname)
         if not name.endswith('/'):
             name += '/'
         logger().debug("delete name: %s", name)
-        result = self.bucket.delete_object(name)
+        self.bucket.delete_object(name)
+
+    def _is_bucket_public(self):
+        return not self.bucket_acl == BUCKET_ACL_PRIVATE
+
+    def public_url(self, name):
+        key = self._get_key_name(name)
+        scheme, endpoint = self.end_point.split('//')
+
+        return urljoin(scheme + '//' + self.bucket_name + '.' + endpoint, key)
+
+    def sign_url(self, name):
+        key = self._get_key_name(name)
+
+        return self.bucket.sign_url('GET', key, expires=self.expire_time)
+
 
 class OssMediaStorage(OssStorage):
+    LOCATION = getattr(settings, 'OSS_MEDIA_LOCATION', '/')
+    BUCKET_NAME = getattr(settings, 'OSS_MEDIA_BUCKET_NAME')
+
     def __init__(self):
-        fallback_location = settings.MEDIA_URL
-        if fallback_location.startswith('http'):
-            fallback_location = '/media/'
         super(OssMediaStorage, self).__init__(
-            location=getattr(settings, 'OSS_MEDIA_LOCATION', fallback_location),
-            base_url=settings.MEDIA_URL)
+            bucket_name=self.BUCKET_NAME,
+            location=self.LOCATION)
 
 
 class OssStaticStorage(OssStorage):
+    LOCATION = getattr(settings, 'OSS_STATIC_LOCATION', '/')
+    BUCKET_NAME = getattr(settings, 'OSS_STATIC_BUCKET_NAME')
+
     def __init__(self):
-        fallback_location = settings.STATIC_URL
-        if fallback_location.startswith('http'):
-            fallback_location = '/static/'
         super(OssStaticStorage, self).__init__(
-            location=getattr(settings, 'OSS_STATIC_LOCATION', fallback_location),
-            base_url=settings.STATIC_URL
-        )
+            location=self.LOCATION,
+            bucket_name=self.BUCKET_NAME)
 
 
 class OssFile(File):
