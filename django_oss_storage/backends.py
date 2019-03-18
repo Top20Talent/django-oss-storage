@@ -242,7 +242,7 @@ class OssStorage(Storage):
 
 class OssMediaStorage(OssStorage):
     LOCATION = getattr(settings, 'OSS_MEDIA_LOCATION', '/')
-    BUCKET_NAME = getattr(settings, 'OSS_MEDIA_BUCKET_NAME')
+    BUCKET_NAME = getattr(settings, 'OSS_MEDIA_BUCKET_NAME', None)
 
     def __init__(self):
         super(OssMediaStorage, self).__init__(
@@ -252,7 +252,7 @@ class OssMediaStorage(OssStorage):
 
 class OssStaticStorage(OssStorage):
     LOCATION = getattr(settings, 'OSS_STATIC_LOCATION', '/')
-    BUCKET_NAME = getattr(settings, 'OSS_STATIC_BUCKET_NAME')
+    BUCKET_NAME = getattr(settings, 'OSS_STATIC_BUCKET_NAME', None)
 
     def __init__(self):
         super(OssStaticStorage, self).__init__(
