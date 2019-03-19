@@ -241,23 +241,25 @@ class OssStorage(Storage):
 
 
 class OssMediaStorage(OssStorage):
-    LOCATION = getattr(settings, 'OSS_MEDIA_LOCATION', '/')
-    BUCKET_NAME = getattr(settings, 'OSS_MEDIA_BUCKET_NAME', None)
 
-    def __init__(self):
+    def __init__(self, location=None, bucket_name=None):
+        self._location = location or getattr(settings, 'OSS_MEDIA_LOCATION', '/')
+        self._bucket_name = bucket_name or getattr(settings, 'OSS_MEDIA_BUCKET_NAME', None)
+
         super(OssMediaStorage, self).__init__(
-            bucket_name=self.BUCKET_NAME,
-            location=self.LOCATION)
+            location=self._location,
+            bucket_name=self._bucket_name)
 
 
 class OssStaticStorage(OssStorage):
-    LOCATION = getattr(settings, 'OSS_STATIC_LOCATION', '/')
-    BUCKET_NAME = getattr(settings, 'OSS_STATIC_BUCKET_NAME', None)
 
-    def __init__(self):
+    def __init__(self, location=None, bucket_name=None):
+        self._location = location or getattr(settings, 'OSS_STATIC_LOCATION', '/')
+        self._bucket_name = bucket_name or getattr(settings, 'OSS_STATIC_BUCKET_NAME', None)
+
         super(OssStaticStorage, self).__init__(
-            location=self.LOCATION,
-            bucket_name=self.BUCKET_NAME)
+            location=self._location,
+            bucket_name=self._bucket_name)
 
 
 class OssFile(File):
